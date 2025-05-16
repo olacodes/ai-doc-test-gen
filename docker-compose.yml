@@ -1,0 +1,32 @@
+version: '3.11'
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/code
+    depends_on:
+      - redis
+      - db
+
+  worker:
+    build: .
+    command: celery -A worker.celery_worker worker --loglevel=info
+    depends_on:
+      - redis
+      - db
+
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: aiuser
+      POSTGRES_PASSWORD: aipass
+      POSTGRES_DB: aidocs
+    ports:
+      - "5432:5432"

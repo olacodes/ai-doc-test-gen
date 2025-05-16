@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+asyncpg
+pydantic
+alembic
+celery[redis]
+python-dotenv
+openai
+langchain>=0.1.14
+langchain-community>=0.0.21
+openai>=1.0.0
+tiktoken
+GitPython
+psycopg2
