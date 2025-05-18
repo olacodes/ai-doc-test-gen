@@ -1,9 +1,13 @@
-from app.logger import setup_logger
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
 import os
 import logging
-from app.prompts.documentation import documentation_prompt
+import asyncio
+from langchain.schema import StrOutputParser  # Ensure this is the correct import
+
+from langchain.chat_models import ChatOpenAI
+
+from app.logger import setup_logger
+from app.prompts.documentation_prompt import build_documentation_prompt
+from app.prompts.test_prompt import build_test_prompt
 
 
 logger = setup_logger(__name__, level=logging.DEBUG)
@@ -20,36 +24,26 @@ llm = ChatOpenAI(
 
 
 async def generate_docs_from_code(code: str, job_data: dict) -> tuple[str, str]:
-    documentation_prompt = documentation_prompt(code, job_data)
-    prompt = ChatPromptTemplate.from_template(
-        """
-        You're a senior software engineer.
+    language = job_data["language"]
+    doc_chat_prompt = build_documentation_prompt()
+    test_chat_prompt = build_test_prompt()
 
-        Given this {language} code:
-        ```{code}```
+    doc_chain = doc_chat_prompt | llm | StrOutputParser()
+    test_chain = test_chat_prompt | llm | StrOutputParser()
 
-        1. Write clean documentation in Markdown format.
-        2. Then write corresponding unit tests (using mocks if needed).
-        
-        Return:
-        ---
-        [DOCUMENTATION]
-        ...
-        [TESTS]
-        ...
-        """
+    doc_response, test_response = await asyncio.gather(
+        doc_chain.ainvoke({"code": code, "language": language}),
+        test_chain.ainvoke({"code": code, "language": language}),
     )
-    chain = prompt | llm
-    response = await chain.ainvoke({"code": code, "language": job_data["language"]})
 
-    response = response.content if hasattr(response, "content") else str(response)
+    doc_response = (
+        doc_response.content if hasattr(doc_response, "content") else str(doc_response)
+    )
 
-    logger.info(f"=========Response ========={response}")
+    test_response = (
+        test_response.content
+        if hasattr(test_response, "content")
+        else str(test_response)
+    )
 
-    # Extract sections
-    doc_part = response.split("[DOCUMENTATION]")[-1].split("[TESTS]")[0].strip()
-    test_part = response.split("[TESTS]")[-1].strip()
-
-    logger.info(f"=========Doc Part ========={doc_part}")
-    logger.info(f"=========Test Part ========={test_part}")
-    return doc_part, test_part
+    return doc_response, test_response

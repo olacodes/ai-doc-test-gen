@@ -22,8 +22,6 @@ logger = setup_logger(__name__, level=logging.DEBUG)
 
 
 # @celery_app.task(bind=True)
-
-
 async def generate_documentation_task(job_data: dict):
     job_id = str(uuid.uuid4())
     # loop = asyncio.get_event_loop()
@@ -50,18 +48,15 @@ async def run_job(job_data: dict, job_id: str):
 
             logger.info(f"Cloned repo to {repo_path}")
 
-            code_paths = collect_code_files(repo_path, extensions=(".py", ".kt"))
+            code_paths = collect_code_files(repo_path, extensions=(".py", ".kt", ".js", ".java"))
             code_snippets = read_code_snippets(code_paths)
 
             logger.info(f"Collected {len(code_snippets)} code snippets")
 
-            # Use only top 1–2 files for now to limit token cost
-            sampled_code = "\n\n".join(code_snippets)
-            
-            # logger.info(f"Sampled code: {sampled_code}")
+            code_snippets_string = "\n\n".join(code_snippets)
 
             # Send to LLM
-            docs, tests = await generate_docs_from_code(sampled_code, job_data)
+            docs, tests = await generate_docs_from_code(code_snippets_string, job_data)
 
             # Save to disk
             save_job_output(job_id, docs, tests)
